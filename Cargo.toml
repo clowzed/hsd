@@ -66,3 +66,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Regex for validation
 regex = "1"
+
+# Platform directories (Documents, etc.)
+dirs = "5"

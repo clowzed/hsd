@@ -228,7 +228,13 @@ impl PdfGenerator {
 
 impl Default for PdfGenerator {
     fn default() -> Self {
-        Self::new("output")
+        // Use Documents folder for generated PDFs to avoid read-only filesystem issues
+        let output_dir = dirs::document_dir()
+            .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| std::env::temp_dir().into()))
+            .join("HonestSignScanner")
+            .join("pdfs");
+
+        Self::new(output_dir)
     }
 }
 
