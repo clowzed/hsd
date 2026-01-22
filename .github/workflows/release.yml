@@ -1,0 +1,105 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install dependencies
+        run: |
+          brew install create-dmg
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Create app bundle
+        run: |
+          APP_NAME="Honest Sign Scanner"
+          BUNDLE_NAME="Honest Sign Scanner.app"
+
+          mkdir -p "$BUNDLE_NAME/Contents/MacOS"
+          mkdir -p "$BUNDLE_NAME/Contents/Resources"
+
+          cp target/release/honest-sign-scanner "$BUNDLE_NAME/Contents/MacOS/"
+
+          # Copy assets if they exist
+          if [ -d "assets" ]; then
+            cp -r assets "$BUNDLE_NAME/Contents/Resources/"
+          fi
+
+          # Create Info.plist
+          cat > "$BUNDLE_NAME/Contents/Info.plist" << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key>
+            <string>Honest Sign Scanner</string>
+            <key>CFBundleDisplayName</key>
+            <string>Honest Sign Scanner</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.hsd.honest-sign-scanner</string>
+            <key>CFBundleVersion</key>
+            <string>1.0.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleExecutable</key>
+            <string>honest-sign-scanner</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>NSSupportsAutomaticGraphicsSwitching</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Honest Sign Scanner" \
+            --volicon "assets/icon.icns" 2>/dev/null || true
+
+          # Fallback without icon if it doesn't exist
+          create-dmg \
+            --volname "Honest Sign Scanner" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Honest Sign Scanner.app" 175 120 \
+            --hide-extension "Honest Sign Scanner.app" \
+            --app-drop-link 425 120 \
+            "HonestSignScanner-macos.dmg" \
+            "Honest Sign Scanner.app" || \
+          hdiutil create -volname "Honest Sign Scanner" -srcfolder "Honest Sign Scanner.app" -ov -format UDZO "HonestSignScanner-macos.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: HonestSignScanner-macos.dmg
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: HonestSignScanner-macos.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
