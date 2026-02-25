@@ -1,0 +1,63 @@
+[package]
+name = "honest-sign-scanner"
+version = "0.1.0"
+edition = "2021"
+description = "Honest Sign barcode scanner and label generator for Russian product marking system"
+authors = ["Your Name"]
+license = "MIT"
+
+[lib]
+name = "honest_sign_scanner_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri framework
+tauri = { version = "2", features = [] }
+
+# Async runtime
+tokio = { version = "1", features = ["full", "sync", "rt-multi-thread"] }
+
+# Serial port communication
+tokio-serial = "5.4"
+
+# PDF generation
+pdf-writer = "0.12"
+
+# DataMatrix barcode generation
+datamatrix = "0.3"
+
+# Audio playback
+rodio = "0.19"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Date/time handling
+chrono = "0.4"
+
+# Image processing
+image = "0.25"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Derive macros
+derive-getters = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Regex for validation
+regex = "1"
+
+# Platform directories (Documents, etc.)
+dirs = "5"
