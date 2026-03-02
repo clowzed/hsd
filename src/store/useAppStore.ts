@@ -7,6 +7,7 @@ import type {
   CrptResponse,
   AppMode,
   PrinterInfo,
+  BarcodePreset,
 } from "@/types";
 
 interface AppState {
@@ -22,6 +23,14 @@ interface AppState {
   printers: PrinterInfo[];
   isPrinting: boolean;
   currentBufferedPdf: PdfRecord | null;
+
+  barcodeEnabled: boolean;
+  barcodeCopies: number;
+  barcodeActivePreset: string | null;
+  barcodePresets: BarcodePreset[];
+
+  duplicateDetectionBuffered: boolean;
+  duplicateDetectionInstant: boolean;
 
   setScannerStatus: (s: ScannerStatus) => void;
   setScanStarted: () => void;
@@ -40,6 +49,15 @@ interface AppState {
   setPrinting: (v: boolean) => void;
   setBufferedPdf: (record: PdfRecord | null) => void;
   removeCode: (index: number) => void;
+
+  setBarcodeEnabled: (v: boolean) => void;
+  setBarcodeCopies: (n: number) => void;
+  setBarcodeActivePreset: (name: string | null) => void;
+  setBarcodePresets: (presets: BarcodePreset[]) => void;
+  updatePresetDirectory: (name: string, directory: string) => void;
+
+  setDuplicateDetectionBuffered: (v: boolean) => void;
+  setDuplicateDetectionInstant: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -55,6 +73,14 @@ export const useAppStore = create<AppState>((set) => ({
   printers: [],
   isPrinting: false,
   currentBufferedPdf: null,
+
+  barcodeEnabled: false,
+  barcodeCopies: 1,
+  barcodeActivePreset: null,
+  barcodePresets: [],
+
+  duplicateDetectionBuffered: true,
+  duplicateDetectionInstant: false,
 
   setScannerStatus: (s) => set({ scannerStatus: s }),
 
@@ -102,4 +128,18 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       scannedCodes: state.scannedCodes.filter((_, i) => i !== index),
     })),
+
+  setBarcodeEnabled: (v) => set({ barcodeEnabled: v }),
+  setBarcodeCopies: (n) => set({ barcodeCopies: n }),
+  setBarcodeActivePreset: (name) => set({ barcodeActivePreset: name }),
+  setBarcodePresets: (presets) => set({ barcodePresets: presets }),
+  updatePresetDirectory: (name, directory) =>
+    set((state) => ({
+      barcodePresets: state.barcodePresets.map((p) =>
+        p.name === name ? { ...p, directory } : p
+      ),
+    })),
+
+  setDuplicateDetectionBuffered: (v) => set({ duplicateDetectionBuffered: v }),
+  setDuplicateDetectionInstant: (v) => set({ duplicateDetectionInstant: v }),
 }));

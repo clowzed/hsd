@@ -65,9 +65,21 @@ export interface PrinterInfo {
   is_default: boolean;
 }
 
+export interface BarcodePreset {
+  name: string;
+  directory: string;
+  default_copies: number;
+}
+
 export interface AppSettings {
   mode: AppMode;
   selected_printer: string | null;
+  barcode_enabled: boolean;
+  barcode_copies: number;
+  barcode_active_preset: string | null;
+  barcode_presets: BarcodePreset[];
+  duplicate_detection_buffered: boolean;
+  duplicate_detection_instant: boolean;
 }
 
 export interface InstantPrintPayload {

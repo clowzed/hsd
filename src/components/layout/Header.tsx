@@ -1,7 +1,9 @@
 import { ScannerStatusIndicator } from "@/components/scanner/ScannerStatus";
 import { ModeToggle } from "@/components/settings/ModeToggle";
 import { PrinterSelect } from "@/components/settings/PrinterSelect";
+import { BarcodeSettings } from "@/components/settings/BarcodeSettings";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/store/useAppStore";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useCommands } from "@/hooks/useCommands";
@@ -12,14 +14,20 @@ export function Header() {
   const appMode = useAppStore((s) => s.appMode);
   const isPrinting = useAppStore((s) => s.isPrinting);
   const currentBufferedPdf = useAppStore((s) => s.currentBufferedPdf);
-  const { clearBuffer, printPdf } = useCommands();
+  const barcodeEnabled = useAppStore((s) => s.barcodeEnabled);
+  const barcodeActivePreset = useAppStore((s) => s.barcodeActivePreset);
+  const barcodeCopies = useAppStore((s) => s.barcodeCopies);
+  const { clearBuffer, printPdf, printBufferedBarcodes } = useCommands();
   const canAct = scannedCodes.length > 0;
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (currentBufferedPdf) {
-      printPdf(currentBufferedPdf.path);
+      await printPdf(currentBufferedPdf.path);
+      if (barcodeEnabled) {
+        await printBufferedBarcodes();
+      }
     }
   };
 
@@ -30,9 +38,16 @@ export function Header() {
       <div className="flex items-center gap-3 flex-1 justify-center">
         <ModeToggle />
         <PrinterSelect />
+        {barcodeEnabled && barcodeActivePreset && (
+          <Badge variant="secondary" className="text-xs gap-1">
+            {barcodeActivePreset} x{barcodeCopies}
+          </Badge>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
+        <BarcodeSettings />
+
         <Button
           variant="ghost"
           size="icon"

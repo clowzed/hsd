@@ -110,17 +110,20 @@ impl ScanAccumulator {
     }
 
     /// Check if there's incomplete data waiting for terminator.
+    #[allow(dead_code)]
     pub fn has_pending(&self) -> bool {
         !self.pending.is_empty()
     }
 
     /// Get the number of pending bytes (for debugging/logging).
+    #[allow(dead_code)]
     pub fn pending_len(&self) -> usize {
         self.pending.len()
     }
 
     /// Clear all pending data.
     /// Use when resetting connection or discarding corrupted data.
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.pending.clear();
     }

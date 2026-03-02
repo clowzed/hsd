@@ -159,9 +159,11 @@ impl HonestSignValidator {
     fn parse_code(raw_data: &[u8]) -> Result<HonestSignCode, ValidationError> {
         // Strip optional symbology prefixes from scanner
         // ]d2 = GS1 DataMatrix, ]C1 = Code 128, etc.
-        let data = if raw_data.starts_with(b"]d2") || raw_data.starts_with(b"]C1") {
-            &raw_data[3..]
-        } else if raw_data.starts_with(b"]d1") || raw_data.starts_with(b"]Q3") {
+        let data = if raw_data.starts_with(b"]d2")
+            || raw_data.starts_with(b"]C1")
+            || raw_data.starts_with(b"]d1")
+            || raw_data.starts_with(b"]Q3")
+        {
             &raw_data[3..]
         } else {
             raw_data
@@ -234,6 +236,7 @@ impl HonestSignValidator {
     fn parse_application_identifiers(data: &[u8], start: usize) -> (Option<String>, Option<String>) {
         let mut serial: Option<String> = None;
         let mut crypto: Option<String> = None;
+        #[allow(unused_assignments)]
         let mut pos = start;
 
         // Find the end of serial number (ends at GS or at next AI)
@@ -365,7 +368,7 @@ impl HonestSignValidator {
             .map(|(i, &d)| if i % 2 == 0 { d * 3 } else { d })
             .sum();
 
-        sum % 10 == 0
+        sum.is_multiple_of(10)
     }
 }
 

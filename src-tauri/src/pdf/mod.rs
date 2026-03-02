@@ -1,3 +1,4 @@
+pub mod barcode;
 mod generator;
 pub mod printer;
 

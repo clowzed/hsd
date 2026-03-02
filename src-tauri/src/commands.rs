@@ -1,6 +1,7 @@
 use crate::audio::SoundType;
 use crate::pdf::{printer, LabelData, PdfGenerator};
 use crate::ui::state::{AppMode, AppSettings, PdfRecord, PrinterInfo, ScannedCode};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{Emitter, State};
 use tokio::sync::{mpsc, Mutex};
@@ -16,6 +17,9 @@ pub struct AppAudio(pub mpsc::UnboundedSender<SoundType>);
 
 /// Shared application settings (mode + printer).
 pub struct AppSettingsState(pub Arc<Mutex<AppSettings>>);
+
+/// Tracks scanned code raw strings for duplicate detection (runtime only, not persisted).
+pub struct AppScanHistory(pub Arc<Mutex<HashSet<String>>>);
 
 fn codes_to_labels(codes: &[ScannedCode], with_index: bool) -> Vec<LabelData> {
     codes
@@ -203,6 +207,7 @@ pub async fn set_mode(
 ) -> Result<(), String> {
     let mut s = settings.0.lock().await;
     s.mode = mode;
+    let _ = crate::ui::persistence::save_settings(&s);
     Ok(())
 }
 
@@ -213,6 +218,7 @@ pub async fn set_printer(
 ) -> Result<(), String> {
     let mut s = settings.0.lock().await;
     s.selected_printer = Some(printer_name);
+    let _ = crate::ui::persistence::save_settings(&s);
     Ok(())
 }
 
@@ -222,4 +228,102 @@ pub async fn get_settings(
 ) -> Result<AppSettings, String> {
     let s = settings.0.lock().await;
     Ok(s.clone())
+}
+
+#[tauri::command]
+pub async fn set_barcode_settings(
+    enabled: bool,
+    copies: u32,
+    active_preset: Option<String>,
+    settings: State<'_, AppSettingsState>,
+) -> Result<(), String> {
+    let mut s = settings.0.lock().await;
+    s.barcode_enabled = enabled;
+    s.barcode_copies = copies;
+    s.barcode_active_preset = active_preset;
+    crate::ui::persistence::save_settings(&s)
+}
+
+#[tauri::command]
+pub async fn set_barcode_preset_directory(
+    preset_name: String,
+    directory: String,
+    settings: State<'_, AppSettingsState>,
+) -> Result<(), String> {
+    let mut s = settings.0.lock().await;
+    if let Some(preset) = s.barcode_presets.iter_mut().find(|p| p.name == preset_name) {
+        preset.directory = directory;
+    } else {
+        return Err(format!("Пресет '{}' не найден", preset_name));
+    }
+    crate::ui::persistence::save_settings(&s)
+}
+
+#[tauri::command]
+pub async fn print_buffered_barcodes(
+    codes_state: State<'_, AppScannedCodes>,
+    settings: State<'_, AppSettingsState>,
+) -> Result<u32, String> {
+    let s = settings.0.lock().await;
+    if !s.barcode_enabled {
+        return Ok(0);
+    }
+    let preset_name = s
+        .barcode_active_preset
+        .clone()
+        .ok_or("Пресет штрихкодов не выбран")?;
+    let preset = s
+        .barcode_presets
+        .iter()
+        .find(|p| p.name == preset_name)
+        .ok_or(format!("Пресет '{}' не найден", preset_name))?
+        .clone();
+    let printer_name = s
+        .selected_printer
+        .clone()
+        .ok_or("Принтер не выбран")?;
+    let copies = s.barcode_copies;
+    drop(s);
+
+    let codes = codes_state.0.lock().await;
+    let mut printed = 0u32;
+    for code in codes.iter() {
+        if let Some(ref vc) = code.vendor_code {
+            if let Some(barcode_path) =
+                crate::pdf::barcode::find_barcode_pdf(&preset.directory, vc)
+            {
+                crate::pdf::barcode::print_barcode(&barcode_path, &printer_name, copies)?;
+                printed += 1;
+            }
+        }
+    }
+    Ok(printed)
+}
+
+#[tauri::command]
+pub async fn select_directory() -> Result<Option<String>, String> {
+    Ok(rfd::FileDialog::new()
+        .pick_folder()
+        .map(|p| p.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+pub async fn set_duplicate_detection(
+    buffered: bool,
+    instant: bool,
+    settings: State<'_, AppSettingsState>,
+) -> Result<(), String> {
+    let mut s = settings.0.lock().await;
+    s.duplicate_detection_buffered = buffered;
+    s.duplicate_detection_instant = instant;
+    crate::ui::persistence::save_settings(&s)
+}
+
+#[tauri::command]
+pub async fn clear_scan_history(
+    scan_history: State<'_, AppScanHistory>,
+) -> Result<(), String> {
+    let mut history = scan_history.0.lock().await;
+    history.clear();
+    Ok(())
 }

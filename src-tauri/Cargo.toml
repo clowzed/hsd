@@ -62,3 +62,6 @@ regex = "1"
 # Platform directories (Documents, etc.)
 dirs = "5"
 printers = "2.3.0"
+
+# Native file dialogs
+rfd = "0.15"

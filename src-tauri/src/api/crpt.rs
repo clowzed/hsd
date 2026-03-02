@@ -128,6 +128,7 @@ pub struct Attribute {
 
 /// Color hint for status display in UI.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[allow(dead_code)]
 pub enum StatusColorHint {
     /// Green - good status (IN_CIRCULATION)
     Green,
@@ -207,22 +208,23 @@ impl Default for CrptClient {
 
 impl CrptResponse {
     /// Returns true if the code is in circulation and can be used.
+    #[allow(dead_code)]
     pub fn is_in_circulation(&self) -> bool {
-        self.outer_status.as_ref().map(|s| s.as_str()) == Some("IN_CIRCULATION")
+        self.outer_status.as_deref() == Some("IN_CIRCULATION")
     }
 
     /// Returns whether this is a valid/acceptable status for adding to buffer.
     /// Accepts IN_CIRCULATION and INTRODUCED statuses for printing labels.
     pub fn is_acceptable_for_label(&self) -> bool {
         matches!(
-            self.outer_status.as_ref().map(|s| s.as_str()),
+            self.outer_status.as_deref(),
             Some("IN_CIRCULATION") | Some("INTRODUCED")
         )
     }
 
     /// Returns the Russian status message.
     pub fn status_message_ru(&self) -> String {
-        match self.outer_status.as_ref().map(|s| s.as_str()) {
+        match self.outer_status.as_deref() {
             Some("IN_CIRCULATION") => "В обороте".to_string(),
             Some("RETIRED") => "Выбыл из оборота".to_string(),
             Some("WITHDRAWN") => "Выведен из оборота".to_string(),
@@ -239,7 +241,7 @@ impl CrptResponse {
 
     /// Returns the Russian status explanation.
     pub fn status_explanation_ru(&self) -> String {
-        match self.outer_status.as_ref().map(|s| s.as_str()) {
+        match self.outer_status.as_deref() {
             Some("IN_CIRCULATION") => "Товар легально в продаже".to_string(),
             Some("RETIRED") => "Товар уже был продан или списан".to_string(),
             Some("WITHDRAWN") => "Товар снят с продажи производителем".to_string(),
@@ -264,8 +266,9 @@ impl CrptResponse {
     }
 
     /// Returns a color hint for UI display
+    #[allow(dead_code)]
     pub fn status_color_hint(&self) -> StatusColorHint {
-        match self.outer_status.as_ref().map(|s| s.as_str()) {
+        match self.outer_status.as_deref() {
             Some("IN_CIRCULATION") => StatusColorHint::Green,
             Some("RETIRED") | Some("WITHDRAWN") => StatusColorHint::Red,
             Some("APPLIED") | Some("EMITTED") => StatusColorHint::Yellow,

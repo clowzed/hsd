@@ -71,6 +71,7 @@ pub enum MertechScannerError {
     #[error("Failed to enumerate available serial ports")]
     PortEnumerationFailed,
 
+    #[allow(dead_code)]
     #[error("Port enumeration timed out")]
     PortEnumerationTimeout,
 
@@ -122,6 +123,7 @@ pub enum MertechScannerConnectionType {
 #[derive(Debug, Getters)]
 pub struct MertechScanner {
     /// Scanner identification information
+    #[allow(dead_code)]
     information: MertechScannerInformation,
 
     /// Receiver for complete barcode data
