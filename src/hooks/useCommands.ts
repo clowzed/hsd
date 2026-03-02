@@ -118,6 +118,87 @@ export function useCommands() {
       if (settings.selected_printer) {
         useAppStore.getState().setPrinter(settings.selected_printer);
       }
+      useAppStore.getState().setBarcodeEnabled(settings.barcode_enabled);
+      useAppStore.getState().setBarcodeCopies(settings.barcode_copies);
+      useAppStore.getState().setBarcodeActivePreset(settings.barcode_active_preset);
+      useAppStore.getState().setBarcodePresets(settings.barcode_presets);
+      useAppStore.getState().setDuplicateDetectionBuffered(settings.duplicate_detection_buffered);
+      useAppStore.getState().setDuplicateDetectionInstant(settings.duplicate_detection_instant);
+    } catch (e) {
+      useAppStore.getState().setError(String(e));
+    }
+  }, []);
+
+  const setBarcodeSettings = useCallback(
+    async (
+      enabled: boolean,
+      copies: number,
+      activePreset: string | null
+    ) => {
+      try {
+        await invoke("set_barcode_settings", {
+          enabled,
+          copies,
+          activePreset,
+        });
+        useAppStore.getState().setBarcodeEnabled(enabled);
+        useAppStore.getState().setBarcodeCopies(copies);
+        useAppStore.getState().setBarcodeActivePreset(activePreset);
+      } catch (e) {
+        useAppStore.getState().setError(String(e));
+      }
+    },
+    []
+  );
+
+  const setBarcodePresetDirectory = useCallback(
+    async (presetName: string, directory: string) => {
+      try {
+        await invoke("set_barcode_preset_directory", {
+          presetName,
+          directory,
+        });
+        useAppStore.getState().updatePresetDirectory(presetName, directory);
+      } catch (e) {
+        useAppStore.getState().setError(String(e));
+      }
+    },
+    []
+  );
+
+  const selectDirectory = useCallback(async (): Promise<string | null> => {
+    try {
+      return await invoke<string | null>("select_directory");
+    } catch (e) {
+      useAppStore.getState().setError(String(e));
+      return null;
+    }
+  }, []);
+
+  const printBufferedBarcodes = useCallback(async () => {
+    try {
+      await invoke<number>("print_buffered_barcodes");
+    } catch (e) {
+      useAppStore.getState().setError(String(e));
+    }
+  }, []);
+
+  const setDuplicateDetection = useCallback(
+    async (buffered: boolean, instant: boolean) => {
+      try {
+        await invoke("set_duplicate_detection", { buffered, instant });
+        useAppStore.getState().setDuplicateDetectionBuffered(buffered);
+        useAppStore.getState().setDuplicateDetectionInstant(instant);
+      } catch (e) {
+        useAppStore.getState().setError(String(e));
+      }
+    },
+    []
+  );
+
+  const clearScanHistory = useCallback(async () => {
+    try {
+      await invoke("clear_scan_history");
     } catch (e) {
       useAppStore.getState().setError(String(e));
     }
@@ -135,5 +216,11 @@ export function useCommands() {
     setMode,
     setPrinter,
     getSettings,
+    setBarcodeSettings,
+    setBarcodePresetDirectory,
+    selectDirectory,
+    printBufferedBarcodes,
+    setDuplicateDetection,
+    clearScanHistory,
   };
 }

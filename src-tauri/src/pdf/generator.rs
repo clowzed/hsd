@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 // Page dimensions for 58mm x 40mm thermal label (in PDF points)
-const PAGE_WIDTH_PT: f32 = 58.0 * 2.83464567;
-const PAGE_HEIGHT_PT: f32 = 40.0 * 2.83464567;
+const PAGE_WIDTH_PT: f32 = 58.0 * 2.834_646;
+const PAGE_HEIGHT_PT: f32 = 40.0 * 2.834_646;
 
 // DataMatrix scale factor (each module becomes scale×scale pixels)
 const DM_SCALE: usize = 2;
@@ -323,7 +323,7 @@ impl PdfGenerator {
 impl Default for PdfGenerator {
     fn default() -> Self {
         let output_dir = dirs::document_dir()
-            .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| std::env::temp_dir().into()))
+            .unwrap_or_else(|| dirs::home_dir().unwrap_or_else(std::env::temp_dir))
             .join("HonestSignScanner")
             .join("pdfs");
 

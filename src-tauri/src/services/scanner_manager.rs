@@ -62,11 +62,13 @@ impl ScannerManager {
     }
 
     /// Subscribes to status updates.
+    #[allow(dead_code)]
     pub fn subscribe_status(&self) -> broadcast::Receiver<ScannerStatus> {
         self.status_tx.subscribe()
     }
 
     /// Returns the current status.
+    #[allow(dead_code)]
     pub async fn current_status(&self) -> ScannerStatus {
         if self.scanner.read().await.is_some() {
             ScannerStatus::Connected

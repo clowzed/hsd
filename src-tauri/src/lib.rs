@@ -11,10 +11,11 @@ use audio::{AudioPlayer, SoundType};
 use commands::*;
 use pdf::{printer, LabelData, PdfGenerator};
 use services::{HonestSignValidator, ScannerManager, ValidationError};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::{mpsc, Mutex};
-use ui::state::{AppMode, AppSettings, ScannedCode, ScannerStatus};
+use ui::state::{AppMode, ScannedCode, ScannerStatus};
 
 /// Event payload for a successful scan.
 #[derive(Clone, serde::Serialize)]
@@ -101,27 +102,32 @@ pub fn run() {
                 }
             });
 
-            // --- Initialize settings with system default printer ---
+            // --- Initialize settings: load from disk, fallback to system default printer ---
             let printers = printer::list_printers();
             let default_printer = printers
                 .iter()
                 .find(|p| p.is_default)
                 .map(|p| p.name.clone());
 
-            let settings = Arc::new(Mutex::new(AppSettings {
-                mode: AppMode::Buffered,
-                selected_printer: default_printer,
-            }));
+            let mut loaded_settings = ui::persistence::load_settings();
+            if loaded_settings.selected_printer.is_none() {
+                loaded_settings.selected_printer = default_printer;
+            }
+            let settings = Arc::new(Mutex::new(loaded_settings));
 
             // --- Shared state ---
             let pdf_generator = Arc::new(PdfGenerator::default());
             let scanned_codes: Arc<Mutex<Vec<ScannedCode>>> =
                 Arc::new(Mutex::new(Vec::new()));
 
+            let scan_history: Arc<Mutex<HashSet<String>>> =
+                Arc::new(Mutex::new(HashSet::new()));
+
             app.manage(AppPdfGenerator(pdf_generator.clone()));
             app.manage(AppScannedCodes(scanned_codes.clone()));
             app.manage(AppAudio(audio_tx.clone()));
             app.manage(AppSettingsState(settings.clone()));
+            app.manage(AppScanHistory(scan_history.clone()));
 
             // --- Scanner + validation pipeline ---
             let (scan_tx, mut scan_rx) = mpsc::channel::<Vec<u8>>(100);
@@ -130,6 +136,7 @@ pub fn run() {
             let scanned_codes_pipeline = scanned_codes.clone();
             let settings_pipeline = settings.clone();
             let pdf_gen_pipeline = pdf_generator.clone();
+            let scan_history_pipeline = scan_history.clone();
 
             // Spawn the scanner manager and status listener
             let handle_status = handle.clone();
@@ -186,6 +193,30 @@ pub fn run() {
 
                             let current_settings = settings_pipeline.lock().await.clone();
 
+                            // Duplicate detection
+                            let duplicate_enabled = match current_settings.mode {
+                                AppMode::Buffered => current_settings.duplicate_detection_buffered,
+                                AppMode::Instant => current_settings.duplicate_detection_instant,
+                            };
+                            if duplicate_enabled {
+                                let mut history = scan_history_pipeline.lock().await;
+                                if !history.insert(scanned_code.code.raw_string.clone()) {
+                                    // Already scanned
+                                    let _ = handle_scanner.emit(
+                                        "scan-error",
+                                        ScanErrorPayload {
+                                            message: "Дубликат".to_string(),
+                                            explanation: format!(
+                                                "Этот код уже был отсканирован ({})",
+                                                scanned_code.product_name
+                                            ),
+                                        },
+                                    );
+                                    let _ = audio_tx_scan.send(SoundType::Error);
+                                    continue;
+                                }
+                            }
+
                             match current_settings.mode {
                                 AppMode::Instant => {
                                     // Instant mode: generate single label + print immediately
@@ -213,6 +244,28 @@ pub fn run() {
                                                                 printer: printer_name.to_string(),
                                                             },
                                                         );
+
+                                                        // Print barcode if enabled
+                                                        if current_settings.barcode_enabled {
+                                                            if let Some(ref preset_name) = current_settings.barcode_active_preset {
+                                                                if let Some(preset) = current_settings.barcode_presets.iter().find(|p| &p.name == preset_name) {
+                                                                    if let Some(ref vc) = scanned_code.vendor_code {
+                                                                        match pdf::barcode::find_barcode_pdf(&preset.directory, vc) {
+                                                                            Some(barcode_path) => {
+                                                                                if let Err(e) = pdf::barcode::print_barcode(&barcode_path, printer_name, current_settings.barcode_copies) {
+                                                                                    tracing::error!("Barcode print failed: {}", e);
+                                                                                    let _ = handle_scanner.emit("error", format!("Ошибка печати штрихкода: {}", e));
+                                                                                }
+                                                                            }
+                                                                            None => {
+                                                                                tracing::warn!("Barcode PDF not found for {}", vc);
+                                                                                let _ = handle_scanner.emit("error", format!("Штрихкод не найден: {} в {}", vc, preset.directory));
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                     Err(e) => {
                                                         let _ = handle_scanner.emit(
@@ -311,6 +364,12 @@ pub fn run() {
             set_mode,
             set_printer,
             get_settings,
+            set_barcode_settings,
+            set_barcode_preset_directory,
+            print_buffered_barcodes,
+            select_directory,
+            set_duplicate_detection,
+            clear_scan_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -33,3 +33,23 @@ pub fn print_pdf(path: &str, printer_name: &str) -> Result<(), String> {
     tracing::info!("Printed {} to printer {}", path, printer_name);
     Ok(())
 }
+
+/// Prints a PDF file letting CUPS auto-detect media size (for marketplace barcode labels).
+pub fn print_pdf_auto_size(path: &str, printer_name: &str) -> Result<(), String> {
+    let printer = get_printer_by_name(printer_name)
+        .ok_or_else(|| format!("Принтер '{}' не найден", printer_name))?;
+
+    printer
+        .print_file(
+            path,
+            PrinterJobOptions {
+                name: Some("Barcode Label"),
+                raw_properties: &[],
+                converter: Converter::None,
+            },
+        )
+        .map_err(|e| format!("Ошибка печати штрихкода: {}", e.message))?;
+
+    tracing::info!("Printed barcode {} to printer {}", path, printer_name);
+    Ok(())
+}
