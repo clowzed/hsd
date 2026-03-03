@@ -178,6 +178,20 @@ pub fn run() {
 
                     match validator.validate(&raw_code).await {
                         Ok(result) => {
+                            let vendor_code = result.response.vendor_code();
+                            let current_settings_for_barcode = settings_pipeline.lock().await.clone();
+                            let barcode_exists = vendor_code.as_ref().map_or(false, |vc| {
+                                current_settings_for_barcode.barcode_active_preset.as_ref()
+                                    .and_then(|preset_name| {
+                                        current_settings_for_barcode.barcode_presets
+                                            .iter()
+                                            .find(|p| &p.name == preset_name)
+                                    })
+                                    .map_or(false, |preset| {
+                                        pdf::barcode::find_barcode_pdf(&preset.directory, vc).is_some()
+                                    })
+                            });
+
                             let scanned_code = ScannedCode {
                                 code: result.code.clone(),
                                 product_name: result
@@ -188,7 +202,8 @@ pub fn run() {
                                 gtin: result.code.gtin.clone(),
                                 produced_date: result.response.formatted_produced_date(),
                                 expire_date: result.response.formatted_expire_date(),
-                                vendor_code: result.response.vendor_code(),
+                                vendor_code,
+                                barcode_exists,
                             };
 
                             let current_settings = settings_pipeline.lock().await.clone();

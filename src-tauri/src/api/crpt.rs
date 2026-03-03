@@ -22,11 +22,22 @@ pub enum CrptError {
     ParseError(String),
 }
 
-/// Request body for the CRPT check endpoint.
-#[derive(Debug, Serialize)]
-struct CheckRequest {
-    code: String,
+/// Catalog data entry from CRPT API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatalogData {
+    pub good_attrs: Option<Vec<GoodAttr>>,
 }
+
+/// Product attribute from catalog data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoodAttr {
+    pub attr_id: Option<i64>,
+    pub attr_name: Option<String>,
+    pub attr_value: Option<String>,
+}
+
+/// Vendor code attribute ID in CRPT catalog data.
+const VENDOR_CODE_ATTR_ID: i64 = 13797;
 
 /// Response from the CRPT check endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +102,9 @@ pub struct CrptResponse {
 
     /// Screen data with product info
     pub screen: Option<ScreenData>,
+
+    /// Catalog data with product attributes (from GET endpoint)
+    pub catalog_data: Option<Vec<CatalogData>>,
 }
 
 /// Screen data containing product details.
@@ -157,23 +171,18 @@ impl CrptClient {
     /// # Returns
     /// The API response containing product information and status.
     pub async fn check_code(&self, code: &str) -> Result<CrptResponse, CrptError> {
-        let url = format!("{}/v2/mobile/check", self.base_url);
-
-        let request = CheckRequest {
-            code: code.to_string(),
-        };
+        let encoded = urlencoding::encode(code);
+        let url = format!(
+            "{}/mobile/check?code={}&codeType=datamatrix",
+            self.base_url, encoded
+        );
 
         tracing::debug!("Checking code with CRPT API: {}", code);
 
         let response = self
             .client
-            .post(&url)
+            .get(&url)
             .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header("Connection", "keep-alive")
-            .header("Pragma", "no-cache")
-            .header("Cache-Control", "no-cache")
-            .json(&request)
             .send()
             .await?;
 
@@ -295,25 +304,16 @@ impl CrptResponse {
         })
     }
 
-    /// Extracts vendor code (артикул) from screen attributes.
+    /// Extracts vendor code from catalogData (attr_id 13797).
     pub fn vendor_code(&self) -> Option<String> {
-        self.screen
+        self.catalog_data
             .as_ref()?
-            .items
+            .first()?
+            .good_attrs
             .as_ref()?
             .iter()
-            .flat_map(|item| item.attr_list.as_ref().into_iter().flatten())
-            .find(|attr| {
-                attr.label
-                    .as_deref()
-                    .map(|l| {
-                        l.contains("Артикул")
-                            || l.contains("артикул")
-                            || l.contains("Код товара")
-                    })
-                    .unwrap_or(false)
-            })
-            .and_then(|attr| attr.value.clone())
+            .find(|a| a.attr_id == Some(VENDOR_CODE_ATTR_ID))
+            .and_then(|a| a.attr_value.clone())
     }
 }
 

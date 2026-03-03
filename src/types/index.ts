@@ -21,6 +21,7 @@ export interface ScannedCode {
   produced_date: string | null;
   expire_date: string | null;
   vendor_code: string | null;
+  barcode_exists: boolean;
 }
 
 export interface CrptResponse {

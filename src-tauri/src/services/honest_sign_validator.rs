@@ -139,9 +139,10 @@ impl HonestSignValidator {
         }
 
         tracing::info!(
-            "Code validated successfully: {} - {}",
+            "Code validated successfully: {} - {} (vendor: {:?})",
             code.gtin,
-            response.product_name.as_deref().unwrap_or("Unknown")
+            response.product_name.as_deref().unwrap_or("Unknown"),
+            response.vendor_code()
         );
 
         Ok(ValidationResult { code, response })

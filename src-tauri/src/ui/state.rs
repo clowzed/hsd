@@ -27,6 +27,7 @@ pub struct ScannedCode {
     pub produced_date: Option<String>,
     pub expire_date: Option<String>,
     pub vendor_code: Option<String>,
+    pub barcode_exists: bool,
 }
 
 /// Result of the last scan operation

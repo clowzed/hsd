@@ -3,7 +3,7 @@ import { useCommands } from "@/hooks/useCommands";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Package, X } from "lucide-react";
+import { Package, X, FileCheck, FileX } from "lucide-react";
 
 export function CodeBuffer() {
   const codes = useAppStore((s) => s.scannedCodes);
@@ -36,8 +36,13 @@ export function CodeBuffer() {
                     {code.gtin}
                   </span>
                   {code.vendor_code && (
-                    <span className="text-xs text-muted-foreground shrink-0">
+                    <span className="text-xs text-muted-foreground shrink-0 flex items-center gap-1">
                       {code.vendor_code}
+                      {code.barcode_exists ? (
+                        <FileCheck className="w-3 h-3 text-emerald-500" />
+                      ) : (
+                        <FileX className="w-3 h-3 text-red-400" />
+                      )}
                     </span>
                   )}
                   <span className="text-muted-foreground truncate text-xs flex-1">
