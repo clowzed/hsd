@@ -63,5 +63,8 @@ regex = "1"
 dirs = "5"
 printers = "2.3.0"
 
+# URL encoding
+urlencoding = "2"
+
 # Native file dialogs
 rfd = "0.15"
