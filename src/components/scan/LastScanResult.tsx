@@ -1,7 +1,7 @@
 import { useAppStore } from "@/store/useAppStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, XCircle, ScanBarcode, Printer, FileCheck, FileX } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ScanBarcode, Printer, FileCheck } from "lucide-react";
 
 export function LastScanResult() {
   const result = useAppStore((s) => s.lastScanResult);
@@ -55,10 +55,8 @@ export function LastScanResult() {
                   <span className="text-muted-foreground">Артикул</span>
                   <span className="font-medium flex items-center gap-1.5">
                     {result.code.vendor_code}
-                    {result.code.barcode_exists ? (
+                    {result.code.barcode_exists && (
                       <FileCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <FileX className="w-3.5 h-3.5 text-red-400" />
                     )}
                   </span>
                 </>

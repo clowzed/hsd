@@ -195,7 +195,54 @@ impl CrptClient {
             )));
         }
 
-        let crpt_response: CrptResponse = response.json().await.map_err(|e| {
+        let mut value: serde_json::Value = response.json().await.map_err(|e| {
+            CrptError::ParseError(format!("Failed to parse response: {}", e))
+        })?;
+
+        // The GET endpoint nests status/dates inside category-specific data
+        // (e.g. autofluidsData.status). Promote them to top-level fields
+        // so our CrptResponse struct works uniformly.
+        if let Some(category) = value.get("category").and_then(|c| c.as_str()).map(String::from) {
+            let data_key = format!("{}Data", category);
+            if let Some(cat_data) = value.get(&data_key).cloned() {
+                if value.get("outerStatus").is_none() {
+                    if let Some(status) = cat_data.get("status") {
+                        value["outerStatus"] = status.clone();
+                    }
+                }
+                if value.get("producedDate").is_none() {
+                    if let Some(pd) = cat_data.get("producedDate") {
+                        value["producedDate"] = pd.clone();
+                    }
+                }
+                if value.get("expireDate").is_none() {
+                    // Category data may use expirationDate as ISO string
+                    if let Some(ed) = cat_data.get("expirationDate") {
+                        if let Some(s) = ed.as_str() {
+                            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+                                value["expireDate"] = serde_json::json!(dt.timestamp_millis());
+                            }
+                        } else {
+                            value["expireDate"] = ed.clone();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Promote gtin/serial from codeResolveData if not at top level
+        if value.get("gtin").is_none() {
+            if let Some(gtin) = value.pointer("/codeResolveData/gtin").cloned() {
+                value["gtin"] = gtin;
+            }
+        }
+        if value.get("serial").is_none() {
+            if let Some(serial) = value.pointer("/codeResolveData/ais/serial").cloned() {
+                value["serial"] = serial;
+            }
+        }
+
+        let crpt_response: CrptResponse = serde_json::from_value(value).map_err(|e| {
             CrptError::ParseError(format!("Failed to parse response: {}", e))
         })?;
 
