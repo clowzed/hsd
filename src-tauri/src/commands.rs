@@ -263,6 +263,7 @@ pub async fn set_barcode_preset_directory(
 pub async fn print_buffered_barcodes(
     codes_state: State<'_, AppScannedCodes>,
     settings: State<'_, AppSettingsState>,
+    pdf_generator: State<'_, AppPdfGenerator>,
 ) -> Result<u32, String> {
     let s = settings.0.lock().await;
     if !s.barcode_enabled {
@@ -286,17 +287,58 @@ pub async fn print_buffered_barcodes(
     drop(s);
 
     let codes = codes_state.0.lock().await;
-    let mut printed = 0u32;
+
+    // Collect all barcode PDFs with their copy counts
+    let mut barcode_inputs: Vec<(std::path::PathBuf, u32)> = Vec::new();
     for code in codes.iter() {
         if let Some(ref vc) = code.vendor_code {
             if let Some(barcode_path) =
                 crate::pdf::barcode::find_barcode_pdf(&preset.directory, vc)
             {
-                crate::pdf::barcode::print_barcode(&barcode_path, &printer_name, copies)?;
-                printed += 1;
+                barcode_inputs.push((barcode_path, copies));
             }
         }
     }
+
+    if barcode_inputs.is_empty() {
+        return Ok(0);
+    }
+
+    let printed = barcode_inputs.len() as u32;
+
+    // Also include the honest signs PDF if available
+    let honest_signs_pdf = {
+        let labels = codes_to_labels(&codes, true);
+        pdf_generator.0.generate(&labels).ok()
+    };
+    drop(codes);
+
+    // Build merge inputs: honest signs first, then all barcodes
+    let mut merge_inputs: Vec<(&std::path::Path, u32)> = Vec::new();
+    if let Some(ref hs) = honest_signs_pdf {
+        merge_inputs.push((hs.path.as_path(), 1));
+    }
+    for (path, cp) in &barcode_inputs {
+        merge_inputs.push((path.as_path(), *cp));
+    }
+
+    let merged_bytes = crate::pdf::merge::merge_pdfs(&merge_inputs)?;
+    let output_dir = pdf_generator.0.output_dir();
+    let merged_path = output_dir.join(format!(
+        "combined_barcodes_{}.pdf",
+        chrono::Local::now().format("%Y%m%d_%H%M%S")
+    ));
+    std::fs::write(&merged_path, merged_bytes)
+        .map_err(|e| format!("Failed to write merged PDF: {}", e))?;
+
+    printer::print_pdf_auto_size(&merged_path.to_string_lossy(), &printer_name)?;
+    tracing::info!(
+        "Printed combined PDF ({} honest signs + {} barcodes) to {}",
+        honest_signs_pdf.as_ref().map_or(0, |hs| hs.code_count),
+        printed,
+        printer_name
+    );
+
     Ok(printed)
 }
 
