@@ -63,6 +63,9 @@ regex = "1"
 dirs = "5"
 printers = "2.3.0"
 
+# PDF merging (read existing barcode PDFs)
+lopdf = "0.34"
+
 # URL encoding
 urlencoding = "2"
 

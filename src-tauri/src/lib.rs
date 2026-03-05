@@ -245,8 +245,50 @@ pub fn run() {
 
                                         match pdf_gen_pipeline.generate(&[label]) {
                                             Ok(generated) => {
-                                                let path = generated.path.to_string_lossy().to_string();
-                                                match printer::print_pdf(&path, printer_name) {
+                                                // Try to combine honest sign + barcode into one PDF
+                                                let barcode_path = if current_settings.barcode_enabled {
+                                                    current_settings.barcode_active_preset.as_ref()
+                                                        .and_then(|preset_name| {
+                                                            current_settings.barcode_presets.iter().find(|p| &p.name == preset_name)
+                                                        })
+                                                        .and_then(|preset| {
+                                                            scanned_code.vendor_code.as_ref()
+                                                                .and_then(|vc| pdf::barcode::find_barcode_pdf(&preset.directory, vc))
+                                                        })
+                                                } else {
+                                                    None
+                                                };
+
+                                                let print_path = if let Some(ref bp) = barcode_path {
+                                                    // Merge honest sign + barcode copies into one PDF
+                                                    let inputs: Vec<(&std::path::Path, u32)> = vec![
+                                                        (generated.path.as_path(), 1),
+                                                        (bp.as_path(), current_settings.barcode_copies),
+                                                    ];
+                                                    match pdf::merge::merge_pdfs(&inputs) {
+                                                        Ok(merged_bytes) => {
+                                                            let merged_path = generated.path.with_file_name(
+                                                                format!("combined_{}", generated.path.file_name().unwrap().to_string_lossy())
+                                                            );
+                                                            if let Err(e) = std::fs::write(&merged_path, merged_bytes) {
+                                                                tracing::error!("Failed to write merged PDF: {}", e);
+                                                                generated.path.to_string_lossy().to_string()
+                                                            } else {
+                                                                tracing::info!("Merged honest sign + barcode into {}", merged_path.display());
+                                                                merged_path.to_string_lossy().to_string()
+                                                            }
+                                                        }
+                                                        Err(e) => {
+                                                            tracing::error!("Failed to merge PDFs: {}", e);
+                                                            // Fall back to printing honest sign only
+                                                            generated.path.to_string_lossy().to_string()
+                                                        }
+                                                    }
+                                                } else {
+                                                    generated.path.to_string_lossy().to_string()
+                                                };
+
+                                                match printer::print_pdf_auto_size(&print_path, printer_name) {
                                                     Ok(()) => {
                                                         let filename = generated.path
                                                             .file_name()
@@ -260,25 +302,15 @@ pub fn run() {
                                                             },
                                                         );
 
-                                                        // Print barcode if enabled
-                                                        if current_settings.barcode_enabled {
-                                                            if let Some(ref preset_name) = current_settings.barcode_active_preset {
-                                                                if let Some(preset) = current_settings.barcode_presets.iter().find(|p| &p.name == preset_name) {
-                                                                    if let Some(ref vc) = scanned_code.vendor_code {
-                                                                        match pdf::barcode::find_barcode_pdf(&preset.directory, vc) {
-                                                                            Some(barcode_path) => {
-                                                                                if let Err(e) = pdf::barcode::print_barcode(&barcode_path, printer_name, current_settings.barcode_copies) {
-                                                                                    tracing::error!("Barcode print failed: {}", e);
-                                                                                    let _ = handle_scanner.emit("error", format!("Ошибка печати штрихкода: {}", e));
-                                                                                }
-                                                                            }
-                                                                            None => {
-                                                                                tracing::warn!("Barcode PDF not found for {}", vc);
-                                                                                let _ = handle_scanner.emit("error", format!("Штрихкод не найден: {} в {}", vc, preset.directory));
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
+                                                        // Log if barcode was not found
+                                                        if current_settings.barcode_enabled && barcode_path.is_none() {
+                                                            if let Some(ref vc) = scanned_code.vendor_code {
+                                                                let dir = current_settings.barcode_active_preset.as_ref()
+                                                                    .and_then(|pn| current_settings.barcode_presets.iter().find(|p| &p.name == pn))
+                                                                    .map(|p| p.directory.as_str())
+                                                                    .unwrap_or("?");
+                                                                tracing::warn!("Barcode PDF not found for {} in {}", vc, dir);
+                                                                let _ = handle_scanner.emit("error", format!("Штрихкод не найден: {} в {}", vc, dir));
                                                             }
                                                         }
                                                     }
