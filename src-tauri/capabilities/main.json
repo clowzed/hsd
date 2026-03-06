@@ -4,6 +4,8 @@
   "description": "Honest Sign Scanner capabilities",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "updater:default",
+    "process:default"
   ]
 }

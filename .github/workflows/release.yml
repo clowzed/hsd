@@ -42,6 +42,9 @@ jobs:
 
       - name: Build Tauri app
         run: npx tauri build --target ${{ matrix.target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
@@ -49,10 +52,76 @@ jobs:
           name: macos-dmg-${{ matrix.arch }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
 
-      - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+      - name: Upload updater artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          name: macos-updater-${{ matrix.arch }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz.sig
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-macos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Generate latest.json
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Read signatures
+          ARM64_SIG=$(cat release-assets/*.aarch64.app.tar.gz.sig 2>/dev/null || cat release-assets/*aarch64*.tar.gz.sig)
+          X64_SIG=$(cat release-assets/*.x86_64.app.tar.gz.sig 2>/dev/null || cat release-assets/*x86_64*.tar.gz.sig)
+
+          # Get filenames
+          ARM64_TAR=$(ls release-assets/*.aarch64.app.tar.gz 2>/dev/null || ls release-assets/*aarch64*.tar.gz)
+          ARM64_TAR=$(basename "$ARM64_TAR")
+          X64_TAR=$(ls release-assets/*.x86_64.app.tar.gz 2>/dev/null || ls release-assets/*x86_64*.tar.gz)
+          X64_TAR=$(basename "$X64_TAR")
+
+          cat > release-assets/latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Update to ${VERSION}",
+            "pub_date": "${DATE}",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "${ARM64_SIG}",
+                "url": "https://github.com/clowzed/hsd-releases/releases/download/${TAG}/${ARM64_TAR}"
+              },
+              "darwin-x86_64": {
+                "signature": "${X64_SIG}",
+                "url": "https://github.com/clowzed/hsd-releases/releases/download/${TAG}/${X64_TAR}"
+              }
+            }
+          }
+          EOF
+
+          echo "Generated latest.json:"
+          cat release-assets/latest.json
+
+      - name: Publish to hsd-releases
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" release-assets/* \
+            --repo clowzed/hsd-releases \
+            --title "$TAG" \
+            --notes "Automated release $TAG"

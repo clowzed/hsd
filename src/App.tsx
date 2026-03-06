@@ -4,6 +4,7 @@ import { useCommands } from "@/hooks/useCommands";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ErrorBanner } from "@/components/common/ErrorBanner";
+import { UpdateBanner } from "@/components/common/UpdateBanner";
 import { LastScanResult } from "@/components/scan/LastScanResult";
 import { CodeBuffer } from "@/components/scan/CodeBuffer";
 import { useAppStore } from "@/store/useAppStore";
@@ -26,6 +27,7 @@ export default function App() {
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 flex flex-col gap-4 p-5 overflow-y-auto min-w-0">
+          <UpdateBanner />
           {currentError && (
             <ErrorBanner
               message={currentError}
