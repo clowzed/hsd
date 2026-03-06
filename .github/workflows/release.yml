@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - '**'
-    tags:
-      - 'v*'
   pull_request:
   workflow_dispatch:
 
@@ -61,35 +59,54 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.tar.gz.sig
 
   publish-release:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.ref == 'refs/heads/main'
     needs: build-macos
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version and check tag
+        id: version
+        run: |
+          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          TAG="v${VERSION}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download all artifacts
+        if: steps.version.outputs.exists == 'false'
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: List artifacts
-        run: find artifacts -type f | sort
-
       - name: Flatten artifacts
+        if: steps.version.outputs.exists == 'false'
         run: |
           mkdir -p release-assets
           find artifacts -type f -exec cp {} release-assets/ \;
           ls -la release-assets/
 
       - name: Generate latest.json
+        if: steps.version.outputs.exists == 'false'
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          # Read signatures
           ARM64_SIG=$(cat release-assets/*.aarch64.app.tar.gz.sig 2>/dev/null || cat release-assets/*aarch64*.tar.gz.sig)
           X64_SIG=$(cat release-assets/*.x86_64.app.tar.gz.sig 2>/dev/null || cat release-assets/*x86_64*.tar.gz.sig)
 
-          # Get filenames
           ARM64_TAR=$(ls release-assets/*.aarch64.app.tar.gz 2>/dev/null || ls release-assets/*aarch64*.tar.gz)
           ARM64_TAR=$(basename "$ARM64_TAR")
           X64_TAR=$(ls release-assets/*.x86_64.app.tar.gz 2>/dev/null || ls release-assets/*x86_64*.tar.gz)
@@ -103,11 +120,11 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "signature": "${ARM64_SIG}",
-                "url": "https://github.com/clowzed/hsd-releases/releases/download/${TAG}/${ARM64_TAR}"
+                "url": "https://github.com/clowzed/hsd/releases/download/${TAG}/${ARM64_TAR}"
               },
               "darwin-x86_64": {
                 "signature": "${X64_SIG}",
-                "url": "https://github.com/clowzed/hsd-releases/releases/download/${TAG}/${X64_TAR}"
+                "url": "https://github.com/clowzed/hsd/releases/download/${TAG}/${X64_TAR}"
               }
             }
           }
@@ -116,12 +133,14 @@ jobs:
           echo "Generated latest.json:"
           cat release-assets/latest.json
 
-      - name: Publish to hsd-releases
+      - name: Create tag and release
+        if: steps.version.outputs.exists == 'false'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
+          TAG="${{ steps.version.outputs.tag }}"
+          git tag "$TAG"
+          git push origin "$TAG"
           gh release create "$TAG" release-assets/* \
-            --repo clowzed/hsd-releases \
             --title "$TAG" \
             --notes "Automated release $TAG"

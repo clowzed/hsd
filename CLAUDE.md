@@ -4,7 +4,7 @@
 When asked to release or bump the version:
 1. Run `./scripts/bump-version.sh <version>` to update version in all 3 files (`package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`)
 2. Commit the version bump and push/merge to main
-3. CI auto-tags (`.github/workflows/auto-tag.yml`) and builds a release (`.github/workflows/release.yml`) to `clowzed/hsd-releases` (public repo)
+3. CI detects version change on main, auto-tags, and publishes a GitHub Release (`.github/workflows/release.yml`)
 
 When making any code changes, always bump the version and include it in the commit so users get the update automatically.
 
@@ -12,9 +12,9 @@ When making any code changes, always bump the version and include it in the comm
 - **Tauri 2** desktop app, macOS only (arm64 + x64)
 - **Frontend**: React 19, TypeScript, Vite 6, Tailwind 4, Zustand 5, shadcn/ui (Radix)
 - **Backend**: Rust with Tokio async runtime
-- **Auto-updater**: `tauri-plugin-updater` checks `clowzed/hsd-releases` on startup, silent download, shows "Перезапустить" banner when ready
+- **Auto-updater**: `tauri-plugin-updater` checks GitHub Releases on startup, silent download, shows "Перезапустить" banner when ready
 - **UI language**: Russian (all user-facing text)
-- **Private repo**: `clowzed/hsd`. Releases published to public `clowzed/hsd-releases`
+- **Repo**: `clowzed/hsd` (public)
 
 ## Project Structure
 ```
@@ -65,4 +65,3 @@ src-tauri/src/                # Rust backend
 
 ## CI/CD Secrets (on clowzed/hsd)
 - `TAURI_SIGNING_PRIVATE_KEY` — signs updater bundles for auto-update verification
-- `RELEASE_TOKEN` — PAT with Contents:write on `clowzed/hsd-releases` for publishing releases
