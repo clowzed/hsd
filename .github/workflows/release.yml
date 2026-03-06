@@ -16,9 +16,9 @@ jobs:
       matrix:
         include:
           - target: aarch64-apple-darwin
-            arch: arm64
+            arch: aarch64
           - target: x86_64-apple-darwin
-            arch: x64
+            arch: x86_64
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -43,6 +43,16 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Rename updater artifacts with arch suffix
+        run: |
+          cd src-tauri/target/${{ matrix.target }}/release/bundle/macos
+          for f in *.app.tar.gz; do
+            base="${f%.app.tar.gz}"
+            mv "$f" "${base}_${{ matrix.arch }}.app.tar.gz"
+            mv "${f}.sig" "${base}_${{ matrix.arch }}.app.tar.gz.sig"
+          done
+          ls -la
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
@@ -90,11 +100,12 @@ jobs:
         with:
           path: artifacts
 
-      - name: Flatten artifacts
+      - name: Prepare release assets
         if: steps.version.outputs.exists == 'false'
         run: |
           mkdir -p release-assets
           find artifacts -type f -exec cp {} release-assets/ \;
+          echo "Release assets:"
           ls -la release-assets/
 
       - name: Generate latest.json
@@ -104,13 +115,11 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          ARM64_SIG=$(cat release-assets/*.aarch64.app.tar.gz.sig 2>/dev/null || cat release-assets/*aarch64*.tar.gz.sig)
-          X64_SIG=$(cat release-assets/*.x86_64.app.tar.gz.sig 2>/dev/null || cat release-assets/*x86_64*.tar.gz.sig)
+          ARM64_SIG=$(cat release-assets/*_aarch64.app.tar.gz.sig)
+          X64_SIG=$(cat release-assets/*_x86_64.app.tar.gz.sig)
 
-          ARM64_TAR=$(ls release-assets/*.aarch64.app.tar.gz 2>/dev/null || ls release-assets/*aarch64*.tar.gz)
-          ARM64_TAR=$(basename "$ARM64_TAR")
-          X64_TAR=$(ls release-assets/*.x86_64.app.tar.gz 2>/dev/null || ls release-assets/*x86_64*.tar.gz)
-          X64_TAR=$(basename "$X64_TAR")
+          ARM64_TAR=$(basename release-assets/*_aarch64.app.tar.gz)
+          X64_TAR=$(basename release-assets/*_x86_64.app.tar.gz)
 
           cat > release-assets/latest.json << EOF
           {
