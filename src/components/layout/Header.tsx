@@ -24,9 +24,10 @@ export function Header() {
 
   const handlePrint = async () => {
     if (currentBufferedPdf) {
-      await printPdf(currentBufferedPdf.path);
       if (barcodeEnabled) {
         await printBufferedBarcodes();
+      } else {
+        await printPdf(currentBufferedPdf.path);
       }
     }
   };
