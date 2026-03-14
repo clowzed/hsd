@@ -204,6 +204,15 @@ export function useCommands() {
     }
   }, []);
 
+  const getRecentLogs = useCallback(async (): Promise<string[]> => {
+    try {
+      return await invoke<string[]>("get_recent_logs");
+    } catch (e) {
+      useAppStore.getState().setError(String(e));
+      return [];
+    }
+  }, []);
+
   return {
     generatePdf,
     clearBuffer,
@@ -222,5 +231,6 @@ export function useCommands() {
     printBufferedBarcodes,
     setDuplicateDetection,
     clearScanHistory,
+    getRecentLogs,
   };
 }

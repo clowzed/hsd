@@ -22,7 +22,7 @@ export function PrinterSelect() {
         value={selectedPrinter ?? ""}
         onValueChange={(v) => setPrinter(v)}
       >
-        <SelectTrigger className="h-8 w-[180px] text-xs">
+        <SelectTrigger className="h-8 w-[140px] text-xs">
           <SelectValue placeholder="Выберите принтер" />
         </SelectTrigger>
         <SelectContent>

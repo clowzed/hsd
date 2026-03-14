@@ -32,6 +32,9 @@ interface AppState {
   duplicateDetectionBuffered: boolean;
   duplicateDetectionInstant: boolean;
 
+  devMode: boolean;
+  updaterLogs: string[];
+
   setScannerStatus: (s: ScannerStatus) => void;
   setScanStarted: () => void;
   setScanSuccess: (code: ScannedCode, response: CrptResponse) => void;
@@ -58,6 +61,9 @@ interface AppState {
 
   setDuplicateDetectionBuffered: (v: boolean) => void;
   setDuplicateDetectionInstant: (v: boolean) => void;
+
+  setDevMode: (v: boolean) => void;
+  addUpdaterLog: (msg: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -81,6 +87,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   duplicateDetectionBuffered: true,
   duplicateDetectionInstant: false,
+
+  devMode: false,
+  updaterLogs: [],
 
   setScannerStatus: (s) => set({ scannerStatus: s }),
 
@@ -142,4 +151,14 @@ export const useAppStore = create<AppState>((set) => ({
 
   setDuplicateDetectionBuffered: (v) => set({ duplicateDetectionBuffered: v }),
   setDuplicateDetectionInstant: (v) => set({ duplicateDetectionInstant: v }),
+
+  setDevMode: (v) => set({ devMode: v }),
+  addUpdaterLog: (msg) =>
+    set((state) => {
+      const logs = [
+        ...state.updaterLogs,
+        `${new Date().toLocaleTimeString()} ${msg}`,
+      ];
+      return { updaterLogs: logs.slice(-50) };
+    }),
 }));
