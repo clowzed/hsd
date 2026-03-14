@@ -3,29 +3,61 @@ import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAppStore } from "@/store/useAppStore";
 
 export function UpdateBanner() {
   const [ready, setReady] = useState(false);
+  const addLog = useAppStore((s) => s.addUpdaterLog);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
+        addLog("Checking for updates...");
         const update = await check();
-        if (cancelled || !update) return;
+        if (cancelled) return;
 
-        await update.downloadAndInstall();
-        if (!cancelled) setReady(true);
-      } catch {
-        // silently ignore update errors
+        if (!update) {
+          addLog("No update available (current version is latest)");
+          return;
+        }
+
+        addLog(
+          `Update found: v${update.version} (current: ${update.currentVersion}), date: ${update.date ?? "unknown"}`
+        );
+        if (update.body) {
+          addLog(`Release notes: ${update.body}`);
+        }
+
+        addLog("Downloading and installing update...");
+        await update.downloadAndInstall((event) => {
+          if (event.event === "Started") {
+            addLog(
+              `Download started, size: ${event.data.contentLength ?? "unknown"} bytes`
+            );
+          } else if (event.event === "Progress") {
+            addLog(
+              `Download progress: ${event.data.chunkLength} bytes chunk`
+            );
+          } else if (event.event === "Finished") {
+            addLog("Download finished");
+          }
+        });
+
+        if (!cancelled) {
+          addLog("Update ready, showing restart banner");
+          setReady(true);
+        }
+      } catch (e) {
+        addLog(`Update error: ${e}`);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [addLog]);
 
   if (!ready) return null;
 

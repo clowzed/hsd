@@ -17,10 +17,22 @@ export function Header() {
   const barcodeEnabled = useAppStore((s) => s.barcodeEnabled);
   const barcodeActivePreset = useAppStore((s) => s.barcodeActivePreset);
   const barcodeCopies = useAppStore((s) => s.barcodeCopies);
-  const { clearBuffer, printPdf, printBufferedBarcodes } = useCommands();
+  const barcodePresets = useAppStore((s) => s.barcodePresets);
+  const { clearBuffer, printPdf, printBufferedBarcodes, setBarcodeSettings } =
+    useCommands();
   const canAct = scannedCodes.length > 0;
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
+
+  const handlePresetCycle = () => {
+    if (!barcodeEnabled || barcodePresets.length < 2) return;
+    const currentIndex = barcodePresets.findIndex(
+      (p) => p.name === barcodeActivePreset
+    );
+    const nextIndex = (currentIndex + 1) % barcodePresets.length;
+    const next = barcodePresets[nextIndex];
+    setBarcodeSettings(barcodeEnabled, next.default_copies, next.name);
+  };
 
   const handlePrint = async () => {
     if (currentBufferedPdf) {
@@ -33,20 +45,24 @@ export function Header() {
   };
 
   return (
-    <header className="flex items-center justify-between px-5 py-3 bg-card border-b shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-none shrink-0 gap-3">
+    <header className="flex items-center justify-between px-3 py-3 bg-card border-b shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:shadow-none shrink-0 gap-2">
       <ScannerStatusIndicator />
 
-      <div className="flex items-center gap-3 flex-1 justify-center">
+      <div className="flex items-center gap-2 flex-1 justify-center min-w-0">
         <ModeToggle />
         <PrinterSelect />
         {barcodeEnabled && barcodeActivePreset && (
-          <Badge variant="secondary" className="text-xs gap-1">
+          <Badge
+            variant="secondary"
+            className="text-xs gap-1 cursor-pointer hover:bg-secondary/80 select-none"
+            onClick={handlePresetCycle}
+          >
             {barcodeActivePreset} x{barcodeCopies}
           </Badge>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 shrink-0">
         <BarcodeSettings />
 
         <Button

@@ -21,6 +21,9 @@ pub struct AppSettingsState(pub Arc<Mutex<AppSettings>>);
 /// Tracks scanned code raw strings for duplicate detection (runtime only, not persisted).
 pub struct AppScanHistory(pub Arc<Mutex<HashSet<String>>>);
 
+/// Shared log buffer for dev tools.
+pub struct AppLogBuffer(pub crate::log_buffer::SharedLogBuffer);
+
 fn codes_to_labels(codes: &[ScannedCode], with_index: bool) -> Vec<LabelData> {
     codes
         .iter()
@@ -368,4 +371,11 @@ pub async fn clear_scan_history(
     let mut history = scan_history.0.lock().await;
     history.clear();
     Ok(())
+}
+
+#[tauri::command]
+pub async fn get_recent_logs(
+    log_buffer: State<'_, AppLogBuffer>,
+) -> Result<Vec<String>, String> {
+    Ok(log_buffer.0.get_entries())
 }

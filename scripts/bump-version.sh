@@ -24,8 +24,8 @@ echo "Bumping version to $VERSION..."
 # 1. package.json
 sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$ROOT/package.json"
 
-# 2. src-tauri/Cargo.toml (only the first version line)
-sed -i '' "0,/^version = \".*\"/s//version = \"$VERSION\"/" "$ROOT/src-tauri/Cargo.toml"
+# 2. src-tauri/Cargo.toml (only the first version = line, under [package])
+awk -v ver="$VERSION" '/^version = "/ && !done { sub(/^version = ".*"/, "version = \"" ver "\""); done=1 } 1' "$ROOT/src-tauri/Cargo.toml" > "$ROOT/src-tauri/Cargo.toml.tmp" && mv "$ROOT/src-tauri/Cargo.toml.tmp" "$ROOT/src-tauri/Cargo.toml"
 
 # 3. src-tauri/tauri.conf.json
 sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$ROOT/src-tauri/tauri.conf.json"

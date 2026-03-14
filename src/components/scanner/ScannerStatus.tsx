@@ -29,15 +29,16 @@ export function ScannerStatusIndicator() {
   const c = statusConfig[status.type];
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div
+      className="flex items-center gap-2 shrink-0"
+      title={
+        status.type === "Error" ? `${c.label}: ${status.message}` : c.label
+      }
+    >
       <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", c.dot)} />
-      <span className="text-sm text-muted-foreground">Сканер:</span>
-      <span className={cn("text-sm font-medium", c.text)}>{c.label}</span>
-      {status.type === "Error" && (
-        <span className="text-xs text-muted-foreground ml-0.5">
-          ({status.message})
-        </span>
-      )}
+      <span className={cn("text-xs font-medium whitespace-nowrap", c.text)}>
+        {c.label}
+      </span>
     </div>
   );
 }

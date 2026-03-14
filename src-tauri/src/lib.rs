@@ -3,6 +3,7 @@ mod audio;
 mod commands;
 mod domain;
 mod infrastructure;
+mod log_buffer;
 pub mod pdf;
 mod services;
 mod ui;
@@ -15,6 +16,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tokio::sync::{mpsc, Mutex};
+use log_buffer::{LogBufferLayer, SharedLogBuffer};
 use ui::state::{AppMode, ScannedCode, ScannerStatus};
 
 /// Event payload for a successful scan.
@@ -78,11 +80,20 @@ fn error_to_message(e: &ValidationError) -> (String, String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive(tracing::Level::INFO.into()),
+    let log_buffer = SharedLogBuffer::new();
+
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer as _;
+
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer().with_filter(
+                tracing_subscriber::EnvFilter::from_default_env()
+                    .add_directive(tracing::Level::INFO.into()),
+            ),
         )
+        .with(LogBufferLayer::new(log_buffer.clone()))
         .init();
 
     tracing::info!("Starting Honest Sign Scanner (Tauri)");
@@ -90,7 +101,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .setup(|app| {
+        .setup(move |app| {
             let handle = app.handle().clone();
 
             // --- Audio: dedicated non-Send thread ---
@@ -130,6 +141,7 @@ pub fn run() {
             app.manage(AppAudio(audio_tx.clone()));
             app.manage(AppSettingsState(settings.clone()));
             app.manage(AppScanHistory(scan_history.clone()));
+            app.manage(commands::AppLogBuffer(log_buffer.clone()));
 
             // --- Scanner + validation pipeline ---
             let (scan_tx, mut scan_rx) = mpsc::channel::<Vec<u8>>(100);
@@ -419,6 +431,7 @@ pub fn run() {
             select_directory,
             set_duplicate_detection,
             clear_scan_history,
+            get_recent_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
